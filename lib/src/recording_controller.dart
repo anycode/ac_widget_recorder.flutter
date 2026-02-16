@@ -107,7 +107,7 @@ class RecordingController {
       '-s',
       '${_width}x$_height',
       '-r',
-      fps.toString(),
+      '$fps',
       '-i',
       _pipe!,
       '-c:v',
@@ -152,7 +152,6 @@ class RecordingController {
 
     _isRecording = false;
     _recordingTimer?.cancel();
-
     await _pipeSink?.flush();
     await _pipeSink?.close();
 
@@ -180,7 +179,6 @@ class RecordingController {
 
     _isRecording = false;
     _recordingTimer?.cancel();
-
     await _pipeSink?.close();
 
     _pipe = null;
