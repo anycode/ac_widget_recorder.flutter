@@ -1,18 +1,16 @@
 ````markdown
-# in_app_recorder
+# ac_widget_recorder
 
-A Flutter plugin to, save it locally, and share the recorded video via native share sheets (social/messaging apps).
+A Flutter plugin to capture widget as a video and save it locally.
+Based on and inspired by `https://github.com/J-Libraries/flutter_screen_capture.git`
 
 > ✅ Records *only your app*, not the entire device screen.
-> ✅ Automatically shares video when recording ends.
 
 ---
 
 ## 🧰 Features
 
 - Start/Stop app-only screen recording
-- Add/remove red border overlay to indicate recording state
-- Automatically share the video file once recorded
 
 ---
 
@@ -22,7 +20,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  in_app_recorder:
+  ac_widget_recorder:
 ````
 
 ---
@@ -70,31 +68,23 @@ Some Android versions may require additional permission handling for screen capt
 ## 🚀 Usage
 
 ```dart
-import 'package:flutter_screen_recorder_overlay/in_app_recorder.dart';
+import 'package:ac_widget_recorder/ac_widget_recorder.dart';
 
-final controller = ScreenRecorderController(videoExportPath: videoExportPath, fps:  8, shareMessage: "Hey this is the recorded video", shareVideo: true);
+final controller = RecorderController(fps:  8);
 
 // Start recording
-await controller.startRecording();
+String? filePath = await controller.startRecording();
 
 // Stop recording and share
-await controller.stopRecordingAndShare();
-```
-
----
-
-## ✅ Add Red Border During Recording
-
-```dart
-// This automatically adds a red border overlay while recording
-await controller.startRecording();
+String? filePath = await controller.stopRecording();
 ```
 
 ---
 
 ## 📂 Output
 
-The recorded file is saved locally (`.mp4`) and then shared using native share sheets on both Android and iOS.
+The recorded file is saved locally (`.mp4`).
+You can pass the output file name as a parameter to `startRecording()`.
 
 ---
 
@@ -113,13 +103,13 @@ Check the `example/` directory for a fully working app.
 
 ## 💬 Issues & Feedback
 
-Feel free to [open an issue](https://github.com/J-Libraries/flutter_screen_capture/issues) or contribute a PR!
+Feel free to [open an issue](https://github.com/anycode/ac_widget_recorder.flutter/issues) or contribute a PR!
 
 ---
 
 ## 📝 License
 
-MIT License © 2025 Nishant Mishra
+MIT License © 2026 Martin Edlman (Anycode)
 
 ```
 
