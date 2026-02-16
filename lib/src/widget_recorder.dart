@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
-import 'package:flutter_widget_recorder/src/recording_controller.dart';
+
+import 'recording_controller.dart';
 
 class WidgetRecorder extends StatefulWidget {
   final Widget child;

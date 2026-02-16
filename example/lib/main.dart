@@ -1,5 +1,5 @@
+import 'package:ac_widget_recorder/ac_widget_recorder.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_widget_recorder/flutter_widget_recorder.dart';
 import 'package:path_provider/path_provider.dart' show getTemporaryDirectory, getDownloadsDirectory;
 import 'package:uuid/uuid.dart' show Uuid;
 

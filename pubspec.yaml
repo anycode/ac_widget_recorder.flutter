@@ -1,7 +1,7 @@
-name: flutter_widget_recorder
+name: ac_widget_recorder
 description: "A widget-level screen recorder for Flutter."
-version: 0.0.9
-repository: https://github.com/J-Libraries/flutter_screen_capture.git
+version: 1.0.0
+repository: https://github.com/anycode/ac_screen_recorder.flutter.git
 
 environment:
   sdk: ^3.8.1
