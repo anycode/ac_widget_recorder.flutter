@@ -31,18 +31,22 @@ class RecordingController {
   /// Callback function called when recording starts. Function is called with
   /// String argument which is the path where the video will be exported.
   final ValueChanged<String>? onStarted;
-  
+
   /// Callback function called when recording ends. Function is called with
   /// String argument which is the path where the video was exported.
   final ValueChanged<String>? onStopped;
-  
+
+  /// Callback function called when recording fails. Function is called with
+  /// Exception argument which is the error that occurred.
+  final ValueChanged<Exception>? onFailed;
+
   /// Callback function called when frame count changes. Function is called with
   /// int argument which is the current frame count.
   final ValueChanged<int>? updateFrameCount;
-  
+
   /// Required frames per second, defaults to 10.
   final int fps;
-  
+
   /// Flag determining whether logs should be printed. Defaults to false.
   final bool showLogs;
 
@@ -60,7 +64,14 @@ class RecordingController {
   /// Receives the current frame count as an argument.
   ///
   /// [showLogs] - Whether to print debug logs during recording. Defaults to false.
-  RecordingController({this.onStarted, this.onStopped, this.fps = 10, this.updateFrameCount, this.showLogs = false});
+  RecordingController({
+    this.onStarted,
+    this.onStopped,
+    this.onFailed,
+    this.fps = 10,
+    this.updateFrameCount,
+    this.showLogs = false,
+  });
 
   /// Start recording.
   ///
@@ -86,55 +97,85 @@ class RecordingController {
       return null;
     }
 
-    _videoExportPath = exportPath ?? '${(await getTemporaryDirectory()).path}/${DateTime.now().millisecondsSinceEpoch}.mp4';
-    developer.log('   Export path: $_videoExportPath');
-
     final image = await boundary.toImage(pixelRatio: 2.0);
     _width = image.width;
     _height = image.height;
 
-    // Create ffmpeg pipe
-    _pipe = await FFmpegKitConfig.registerNewFFmpegPipe();
-    _pipeSink = File(_pipe!).openWrite();
+    _videoExportPath = exportPath ?? '${(await getTemporaryDirectory()).path}/${DateTime.now().millisecondsSinceEpoch}.mp4';
+    developer.log('   Export path: $_videoExportPath');
 
-    // ffmpeg command
-    final command = [
-      '-y',
-      '-f',
-      'rawvideo',
-      '-pix_fmt',
-      'rgba',
-      '-s',
-      '${_width}x$_height',
-      '-r',
-      '$fps',
-      '-i',
-      _pipe!,
-      '-c:v',
-      'libx264',
-      '-pix_fmt',
-      'yuv420p',
-      _videoExportPath,
-    ].join(' ');
+    _startRecording();
 
-    // Run ffmpeg in background
-    FFmpegKit.executeAsync(command, (session) async {
-      returnCode = await session.getReturnCode();
-      if (ReturnCode.isSuccess(returnCode)) {
-        developer.log("✅ Video created at $_videoExportPath");
-      } else {
-        developer.log("❌ FFmpeg failed with code: $returnCode");
-      }
-    });
-
-    // Capture frames periodically
-    final interval = Duration(milliseconds: 1000 ~/ fps);
-    _recordingTimer = Timer.periodic(interval, (_) => _captureFrame());
-
-    developer.log("🎥 Recording started with size: $_width x $_height");
-
-    onStarted?.call(_videoExportPath);
     return _videoExportPath;
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      // Ensure the directory exists
+      final videoFile = File(_videoExportPath);
+      if (!await videoFile.parent.exists()) {
+        await videoFile.parent.create(recursive: true);
+        developer.log('   Created directory: ${videoFile.parent.path}');
+      }
+
+      // Create ffmpeg pipe
+      _pipe = await FFmpegKitConfig.registerNewFFmpegPipe();
+      _pipeSink = File(_pipe!).openWrite();
+
+      // Determine the video codec based on the platform
+      final String videoCodec;
+      if (Platform.isIOS) {
+        // Use hardware-accelerated encoder on iOS
+        videoCodec = 'h264_videotoolbox';
+      } else if (Platform.isAndroid) {
+        // Use hardware-accelerated encoder on Android
+        videoCodec = 'h264_mediacodec';
+      } else {
+        // libx264 is a good software encoder for other platforms
+        videoCodec = 'libx264';
+      }
+
+      // ffmpeg command
+      final command = [
+        '-y',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgba',
+        '-s',
+        '${_width}x$_height',
+        '-r',
+        '$fps',
+        '-i',
+        _pipe!,
+        '-c:v',
+        videoCodec,
+        '-pix_fmt',
+        'yuv420p',
+        _videoExportPath,
+      ].join(' ');
+
+      // Run ffmpeg in background
+      FFmpegKit.executeAsync(command, (session) async {
+        returnCode = await session.getReturnCode();
+        if (ReturnCode.isSuccess(returnCode)) {
+          developer.log("✅ Video created at $_videoExportPath");
+        } else {
+          developer.log("❌ FFmpeg failed with code: $returnCode");
+        }
+      });
+
+      // Capture frames periodically
+      final interval = Duration(milliseconds: 1000 ~/ fps);
+      _recordingTimer = Timer.periodic(interval, (_) => _captureFrame());
+
+      developer.log("🎥 Recording started with size: $_width x $_height");
+
+      onStarted?.call(_videoExportPath);
+    } on Exception catch (ex) {
+      developer.log("⚠️ Error starting recording: $ex");
+      onFailed?.call(ex);
+    }
   }
 
   /// Stop recording and finalize the video.
@@ -198,7 +239,7 @@ class RecordingController {
 
       final image = await boundary.toImage(pixelRatio: 2.0);
       // pipe closed meanwhile
-      if(_pipeSink == null) return;
+      if (_pipeSink == null) return;
 
       final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
       // no data or pipe closed meanwhile
