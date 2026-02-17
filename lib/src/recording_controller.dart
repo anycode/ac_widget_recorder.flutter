@@ -123,13 +123,25 @@ class RecordingController {
       _pipeSink = File(_pipe!).openWrite();
 
       // Determine the video codec based on the platform
-      final String videoCodec;
+      String videoCodec;
       if (Platform.isIOS) {
         // Use hardware-accelerated encoder on iOS
         videoCodec = 'h264_videotoolbox';
+/*
+      TODO - make it working on all Androids RELIABLY
       } else if (Platform.isAndroid) {
-        // Use hardware-accelerated encoder on Android
-        videoCodec = 'h264_mediacodec';
+        // Check if h264_mediacodec is available, otherwise fall back to software.
+        final session = await FFmpegKit.execute('-h encoder=h264_mediacodec');
+        final returnCode = await session.getReturnCode();
+
+        if (ReturnCode.isSuccess(returnCode)) {
+          if (showLogs) developer.log('✅ h264_mediacodec hardware encoder is available.');
+          videoCodec = 'h264_mediacodec';
+        } else {
+          if (showLogs) developer.log('⚠️ h264_mediacodec not available. Falling back to software encoder libx264.');
+          videoCodec = 'libx264';
+        }
+*/
       } else {
         // libx264 is a good software encoder for other platforms
         videoCodec = 'libx264';
