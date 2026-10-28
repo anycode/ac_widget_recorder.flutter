@@ -11,6 +11,7 @@ import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:path_provider/path_provider.dart';
 
 class RecordingController {
+  Completer<ReturnCode?>? _ffmpegCompleter;
   String? _pipe; // Path returned by ffmpeg-kit
   IOSink? _pipeSink; // Writable sink for frames
   Timer? _recordingTimer;
@@ -122,32 +123,8 @@ class RecordingController {
       _pipe = await FFmpegKitConfig.registerNewFFmpegPipe();
       _pipeSink = File(_pipe!).openWrite();
 
-      // Determine the video codec based on the platform
-      String videoCodec;
-      if (Platform.isIOS) {
-        // Use hardware-accelerated encoder on iOS
-        videoCodec = 'h264_videotoolbox';
-/*
-      TODO - make it working on all Androids RELIABLY
-      } else if (Platform.isAndroid) {
-        // Check if h264_mediacodec is available, otherwise fall back to software.
-        final session = await FFmpegKit.execute('-h encoder=h264_mediacodec');
-        final returnCode = await session.getReturnCode();
+      String videoCodec = Platform.isIOS ? 'h264_videotoolbox' : 'libx264';
 
-        if (ReturnCode.isSuccess(returnCode)) {
-          if (showLogs) developer.log('✅ h264_mediacodec hardware encoder is available.');
-          videoCodec = 'h264_mediacodec';
-        } else {
-          if (showLogs) developer.log('⚠️ h264_mediacodec not available. Falling back to software encoder libx264.');
-          videoCodec = 'libx264';
-        }
-*/
-      } else {
-        // libx264 is a good software encoder for other platforms
-        videoCodec = 'libx264';
-      }
-
-      // ffmpeg command
       final command = [
         '-y',
         '-f',
@@ -167,6 +144,9 @@ class RecordingController {
         _videoExportPath,
       ].join(' ');
 
+      // 🔑 Initialize the completer for this session
+      _ffmpegCompleter = Completer<ReturnCode?>();
+
       // Run ffmpeg in background
       FFmpegKit.executeAsync(command, (session) async {
         returnCode = await session.getReturnCode();
@@ -174,6 +154,11 @@ class RecordingController {
           developer.log("✅ Video created at $_videoExportPath");
         } else {
           developer.log("❌ FFmpeg failed with code: $returnCode");
+        }
+
+        // 🔑 Complete the future when FFmpeg actually finishes
+        if (!(_ffmpegCompleter?.isCompleted ?? true)) {
+          _ffmpegCompleter?.complete(returnCode);
         }
       });
 
@@ -208,11 +193,33 @@ class RecordingController {
     await _pipeSink?.flush();
     await _pipeSink?.close();
 
+    // 🔑 Await until FFmpeg completely finishes encoding and writing to disk!
+    if (_ffmpegCompleter != null) {
+      try {
+        await _ffmpegCompleter!.future.timeout(const Duration(seconds: 10));
+      } catch (_) {
+        developer.log("⚠️ FFmpeg completion timed out");
+      }
+    }
+
     _pipe = null;
     _pipeSink = null;
     _frameCount = 0;
 
-    developer.log("🎬 Recording stopped");
+    // --- Final file check ---
+    final file = File(_videoExportPath);
+    if (!await file.exists()) {
+      developer.log("❌ Recording failed: file does not exist.");
+      return null;
+    }
+
+    final currentSize = await file.length();
+    if (currentSize <= 48) {
+      developer.log("❌ Recording failed: file is empty or truncated.");
+      return null;
+    }
+
+    developer.log("🎬 Recording fully encoded and verified: $currentSize bytes at $_videoExportPath");
 
     onStopped?.call(_videoExportPath);
     return _videoExportPath;
